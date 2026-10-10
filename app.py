@@ -11,7 +11,7 @@ import streamlit as st
 
 from classifier import analyze, load_rules
 from registry import IEEE_FILES, IEEERegistry, download_ieee, import_ieee_files, metadata_date
-from reporting import parse_uploaded, mac_like_header, group_table, brand_report, manufacturer_report, csv_bytes, excel_bytes, mac_column_guess, identify_network_columns, network_report, prepare_mac_table
+from reporting import parse_uploaded, mac_like_header, group_table, brand_report, manufacturer_report, csv_bytes, excel_bytes, mac_column_guess, identify_network_columns, network_report, prepare_mac_table, parse_cisco_lines
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
@@ -129,14 +129,14 @@ with tab_inventory:
             source = st.file_uploader("Chọn CSV / TSV / TXT / Excel", type=["csv", "tsv", "txt", "xlsx", "xlsm"])
             table = parse_uploaded(source) if source else None
         else:
-            pasted = st.text_area("Mỗi MAC trên một dòng; có thể kèm dòng tiêu đề MAC", height=140, placeholder="00:11:22:33:44:55\n00-1A-2B-CC-DD-EE\n0011.2233.4455")
-            lines = [x.strip() for x in pasted.splitlines() if x.strip()]
-            if lines and mac_like_header(lines[0]):
-                lines = lines[1:]
-            if lines and any(len(re.split(r"\s+", ln)) >= 4 for ln in lines):
-                parts = [re.split(r"\s+", ln) for ln in lines]
-                table = prepare_mac_table(pd.DataFrame(parts).fillna(""))
+            pasted = st.text_area("Mỗi MAC trên một dòng; có thể kèm dòng tiêu đề MAC", height=140, placeholder="37 249a.b82c.17c0 STATIC Gi1/0/5\n37 249a.d847.33fb STATIC Gi1/0/43")
+            parsed_cisco = parse_cisco_lines(pasted)
+            if not parsed_cisco.empty:
+                table = parsed_cisco
             else:
+                lines = [x.strip() for x in pasted.splitlines() if x.strip()]
+                if lines and mac_like_header(lines[0]):
+                    lines = lines[1:]
                 table = pd.DataFrame({"MAC": lines}) if lines else None
     except Exception as exc:
         st.error(f"Không đọc được file: {exc}")
