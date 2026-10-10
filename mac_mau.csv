@@ -1,0 +1,9 @@
+Asset,MAC,Note
+LAB-AP-01,00:11:22:33:44:55,MAC ví dụ giả lập - hãng sẽ phụ thuộc registry thực tế
+LAB-CAM-01,00-1A-2B-CC-DD-EE,MAC ví dụ giả lập
+LAB-PC-01,0011.2233.4455,Kiểu Cisco notation
+LAB-RANDOM-01,02:11:22:33:44:55,MAC cục bộ - không xác nhận hãng
+LAB-BCAST,FF:FF:FF:FF:FF:FF,Broadcast
+LAB-MULTICAST,01:00:5E:00:00:FB,Multicast
+LAB-INVALID,00:ZZ:12:34:56:78,Sai định dạng
+LAB-DUPLICATE,00:11:22:33:44:55,Đầu vào lặp để kiểm tra giữ nguyên hàng
