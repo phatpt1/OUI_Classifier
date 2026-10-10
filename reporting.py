@@ -18,6 +18,27 @@ def is_cisco_mac(value) -> bool:
     return bool(normalize_mac(str(value).strip()))
 
 
+CISCO_LINE = re.compile(
+    r"^\s*(?P<vlan>\d{1,4}|All)\s+"
+    r"(?P<mac>(?:[0-9a-fA-F]{4}\.){2}[0-9a-fA-F]{4}|(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}|[0-9a-fA-F]{12})\s+"
+    r"(?P<type>DYNAMIC|STATIC|SECURE|SELF|SYSTEM)\s+"
+    r"(?P<port>\S+(?:\s*,\s*\S+)*)\s*$", re.IGNORECASE
+)
+
+
+def parse_cisco_lines(text: str) -> pd.DataFrame:
+    """Split pasted Cisco switch lines into VLAN/MAC/Type/Port; ignore CLI headings."""
+    rows = []
+    for line in text.splitlines():
+        match = CISCO_LINE.fullmatch(line.strip())
+        if match:
+            rows.append(match.groupdict())
+    return pd.DataFrame([
+        {"VLAN": r["vlan"], "MAC Address": r["mac"],
+         "Type": r["type"].upper(), "Port": r["port"]} for r in rows
+    ], columns=["VLAN", "MAC Address", "Type", "Port"])
+
+
 def prepare_mac_table(table: pd.DataFrame) -> pd.DataFrame:
     """Detect headerless Cisco switch MAC tables; preserve every data row."""
     if table.empty:
@@ -28,6 +49,17 @@ def prepare_mac_table(table: pd.DataFrame) -> pd.DataFrame:
     if len(heads) >= 2 and heads[0].isdigit() and is_cisco_mac(heads[1]):
         table = pd.concat([pd.DataFrame([heads], columns=table.columns), table], ignore_index=True)
         table.columns = [f"Cột {i + 1}" for i in range(len(table.columns))]
+    # A one-column Excel/CSV paste can contain an entire Cisco CLI line per cell.
+    # Check column names as well, because read_excel may have consumed the first row as header.
+    if len(table.columns) == 1:
+        col = table.columns[0]
+        first_header = str(col).strip()
+        values = table.iloc[:, 0].astype(str).tolist()
+        if CISCO_LINE.fullmatch(first_header):
+            values.insert(0, first_header)
+        converted = parse_cisco_lines("\n".join(values))
+        if not converted.empty:
+            return converted
     cols = list(table.columns)
     # Headerless Cisco data: VLAN, MAC, TYPE, PORT
     if len(cols) >= 4:
@@ -99,7 +131,8 @@ def parse_uploaded(upload) -> pd.DataFrame:
         lines = [ln.strip() for ln in payload.decode("utf-8-sig").splitlines() if ln.strip()]
         if lines and mac_like_header(lines[0]):
             lines = lines[1:]
-        table = pd.DataFrame({"MAC": lines})
+        parsed = parse_cisco_lines("\n".join(lines))
+        table = parsed if not parsed.empty else pd.DataFrame({"MAC": lines})
     else:
         raise ValueError("Hỗ trợ CSV, TSV, TXT, XLSX, XLSM.")
     if table.empty:
